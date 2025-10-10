@@ -1,6 +1,6 @@
 # FRC2026 - Team 2026 Robot Code
 
-This repository contains the robot code for FIRST Robotics Competition Team 2026's 2025 season robot.
+This repository contains the robot code for FIRST Robotics Competition Team 2026's robot.
 
 ## Robot Configuration
 - **Drive System**: Swerve Drive
@@ -25,9 +25,15 @@ FRC2026/
 ## Getting Started
 
 ### Prerequisites
-- [WPILib 2025](https://docs.wpilib.org/en/latest/docs/zero-to-robot/step-2/wpilib-setup.html)
+- [WPILib 2024](https://docs.wpilib.org/en/stable/docs/zero-to-robot/step-2/wpilib-setup.html)
 - Java 17 (included with WPILib)
 - Git
+
+### Vendor Dependencies
+This project includes the following vendor libraries:
+- **REVLib**: For REV Robotics motor controllers (SparkMax, SparkFlex)
+- **Phoenix 6**: For CTRE motor controllers (TalonFX, Kraken X60)
+- **NavX**: For Kauai Labs gyroscope/IMU
 
 ### Building the Project
 ```bash
