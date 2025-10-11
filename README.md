@@ -3,23 +3,30 @@
 This repository contains the robot code for FIRST Robotics Competition Team 2026's robot.
 
 ## Robot Configuration
-- **Drive System**: Swerve Drive
+- **Drive System**: Swerve Drive (MK4n modules with 7.13:1 gear ratio)
 - **Drivebase Size**: 28" x 28"
 - **Framework**: WPILib Command-Based
 - **Language**: Java 17
+- **Gyroscope**: Pigeon 2.0
+- **Absolute Encoders**: CANcoder on each wheel
 
 ## Project Structure
 ```
 FRC2026/
-├── src/main/java/frc/robot/     # Robot source code
-│   ├── Main.java                 # Robot main entry point
-│   ├── Robot.java                # Main robot class
-│   ├── RobotContainer.java       # Robot subsystems and commands
-│   └── Constants.java            # Robot constants
-├── src/main/deploy/              # Deploy files (configs, paths, etc.)
-├── vendordeps/                   # Vendor library dependencies
-├── build.gradle                  # Gradle build configuration
-└── .github/workflows/            # CI/CD workflows
+├── src/main/java/frc/robot/
+│   ├── Main.java                    # Robot main entry point
+│   ├── Robot.java                   # Main robot class
+│   ├── RobotContainer.java          # Robot subsystems and commands
+│   ├── Constants.java               # Robot constants (CAN IDs, PID values, etc.)
+│   ├── subsystems/
+│   │   ├── SwerveDrive.java         # Swerve drive subsystem
+│   │   └── SwerveModule.java        # Individual swerve module control
+│   └── commands/
+│       └── DriveCommand.java        # Teleop drive command
+├── src/main/deploy/                 # Deploy files (configs, paths, etc.)
+├── vendordeps/                      # Vendor library dependencies
+├── build.gradle                     # Gradle build configuration
+└── .github/workflows/               # CI/CD workflows
 ```
 
 ## Getting Started
@@ -31,9 +38,40 @@ FRC2026/
 
 ### Vendor Dependencies
 This project includes the following vendor libraries:
-- **REVLib**: For REV Robotics motor controllers (SparkMax, SparkFlex)
-- **Phoenix 6**: For CTRE motor controllers (TalonFX, Kraken X60)
+- **REVLib**: For REV Robotics motor controllers (SparkMax, SparkFlex) - used for drive and turning motors
+- **Phoenix 6**: For CTRE hardware (CANcoder absolute encoders, Pigeon 2.0 gyroscope)
 - **NavX**: For Kauai Labs gyroscope/IMU
+
+## Swerve Drive Setup
+
+### Hardware Configuration
+The robot uses a swerve drive system with:
+- **4 MK4n swerve modules** with 7.13:1 gear ratio
+- **CANcoder absolute encoders** on each wheel for precise angle measurement
+- **Pigeon 2.0 gyroscope** for robot heading
+- **REV SparkMax motor controllers** for drive and turning motors
+
+### Controller Mapping (Xbox Controller)
+- **Left Stick Y-Axis**: Forward/Backward movement
+- **Left Stick X-Axis**: Left/Right strafe
+- **Right Stick X-Axis**: Rotation
+- **Back Button**: Reset gyro heading (field-relative zero)
+- **Start Button**: Reset drive encoders
+
+### Initial Calibration
+Before the robot can drive properly, you need to:
+
+1. **Set CAN IDs in Constants.java** - Update the motor controller and encoder CAN IDs to match your wiring
+2. **Calibrate CANcoder Offsets** - Align all wheels forward and record the absolute positions:
+   ```java
+   // In Constants.java, update these values:
+   kFrontLeftEncoderOffset = <measured_value>;
+   kFrontRightEncoderOffset = <measured_value>;
+   kBackLeftEncoderOffset = <measured_value>;
+   kBackRightEncoderOffset = <measured_value>;
+   ```
+3. **Tune PID Constants** - Adjust the turning and drive PID values in Constants.java for smooth operation
+4. **Verify Maximum Speeds** - Adjust `kMaxSpeedMetersPerSecond` based on your robot's capabilities
 
 ### Building the Project
 ```bash
