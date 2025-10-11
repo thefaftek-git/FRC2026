@@ -6,6 +6,10 @@ package frc.robot;
 
 import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.Commands;
+import edu.wpi.first.wpilibj2.command.button.CommandXboxController;
+import frc.robot.Constants.OperatorConstants;
+import frc.robot.commands.DriveCommand;
+import frc.robot.subsystems.SwerveDrive;
 
 /**
  * This class is where the bulk of the robot should be declared. Since Command-based is a
@@ -14,10 +18,20 @@ import edu.wpi.first.wpilibj2.command.Commands;
  * subsystems, commands, and trigger mappings) should be declared here.
  */
 public class RobotContainer {
+  // The robot's subsystems
+  private final SwerveDrive m_swerveDrive = new SwerveDrive();
+
+  // The driver's controller
+  private final CommandXboxController m_driverController =
+      new CommandXboxController(OperatorConstants.kDriverControllerPort);
+
   /** The container for the robot. Contains subsystems, OI devices, and commands. */
   public RobotContainer() {
     // Configure the trigger bindings
     configureBindings();
+    
+    // Configure default commands
+    configureDefaultCommands();
   }
 
   /**
@@ -29,7 +43,43 @@ public class RobotContainer {
    * PS4} controllers or {@link edu.wpi.first.wpilibj2.command.button.CommandJoystick Flight
    * joysticks}.
    */
-  private void configureBindings() {}
+  private void configureBindings() {
+    // Reset gyro heading when back button is pressed
+    m_driverController.back().onTrue(Commands.runOnce(() -> m_swerveDrive.zeroHeading(), m_swerveDrive));
+    
+    // Reset encoders when start button is pressed
+    m_driverController.start().onTrue(Commands.runOnce(() -> m_swerveDrive.resetEncoders(), m_swerveDrive));
+  }
+
+  /**
+   * Configure default commands for subsystems.
+   */
+  private void configureDefaultCommands() {
+    // Set the default command for the drive subsystem
+    // Left stick Y-axis: forward/backward (inverted because joystick Y is negative when pushed forward)
+    // Left stick X-axis: left/right strafe
+    // Right stick X-axis: rotation
+    m_swerveDrive.setDefaultCommand(
+        new DriveCommand(
+            m_swerveDrive,
+            () -> applyDeadband(-m_driverController.getLeftY()),
+            () -> applyDeadband(-m_driverController.getLeftX()),
+            () -> applyDeadband(-m_driverController.getRightX()),
+            true)); // Field-relative drive
+  }
+
+  /**
+   * Apply deadband to joystick input.
+   *
+   * @param value The input value
+   * @return The value with deadband applied
+   */
+  private double applyDeadband(double value) {
+    if (Math.abs(value) < OperatorConstants.kDeadband) {
+      return 0;
+    }
+    return value;
+  }
 
   /**
    * Use this to pass the autonomous command to the main {@link Robot} class.

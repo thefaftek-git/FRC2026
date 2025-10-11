@@ -15,11 +15,64 @@ package frc.robot;
 public final class Constants {
   public static class OperatorConstants {
     public static final int kDriverControllerPort = 0;
+    
+    // Controller deadband
+    public static final double kDeadband = 0.1;
   }
 
   public static class DriveConstants {
     // Swerve drive configuration for 28x28 inch drivebase
     public static final double kTrackWidth = 0.7112; // 28 inches in meters
     public static final double kWheelBase = 0.7112; // 28 inches in meters
+    
+    // MK4n module constants with 7.13:1 gear ratio
+    public static final double kDriveGearRatio = 7.13;
+    public static final double kWheelDiameterMeters = 0.1016; // 4 inches in meters
+    public static final double kDriveMotorRotationsPerMeter = 
+        kDriveGearRatio / (kWheelDiameterMeters * Math.PI);
+    
+    // Maximum speeds
+    public static final double kMaxSpeedMetersPerSecond = 4.5; // Adjust based on testing
+    public static final double kMaxAngularSpeedRadiansPerSecond = Math.PI * 2; // 2 rotations per second
+    
+    // CAN IDs - Update these to match your robot configuration
+    // Front Left Module
+    public static final int kFrontLeftDriveMotorId = 1;
+    public static final int kFrontLeftTurningMotorId = 2;
+    public static final int kFrontLeftCanCoderId = 9;
+    
+    // Front Right Module
+    public static final int kFrontRightDriveMotorId = 3;
+    public static final int kFrontRightTurningMotorId = 4;
+    public static final int kFrontRightCanCoderId = 10;
+    
+    // Back Left Module
+    public static final int kBackLeftDriveMotorId = 5;
+    public static final int kBackLeftTurningMotorId = 6;
+    public static final int kBackLeftCanCoderId = 11;
+    
+    // Back Right Module
+    public static final int kBackRightDriveMotorId = 7;
+    public static final int kBackRightTurningMotorId = 8;
+    public static final int kBackRightCanCoderId = 12;
+    
+    // Pigeon 2.0 CAN ID
+    public static final int kPigeonId = 13;
+    
+    // Turning motor PID constants - Tune these values
+    public static final double kTurningP = 0.5;
+    public static final double kTurningI = 0.0;
+    public static final double kTurningD = 0.0;
+    
+    // Drive motor PID constants - Tune these values
+    public static final double kDriveP = 0.1;
+    public static final double kDriveI = 0.0;
+    public static final double kDriveD = 0.0;
+    
+    // Encoder offsets in radians - Calibrate these for your robot
+    public static final double kFrontLeftEncoderOffset = 0.0;
+    public static final double kFrontRightEncoderOffset = 0.0;
+    public static final double kBackLeftEncoderOffset = 0.0;
+    public static final double kBackRightEncoderOffset = 0.0;
   }
 }
