@@ -11,6 +11,7 @@ import com.revrobotics.spark.SparkBase.ControlType;
 import com.revrobotics.spark.SparkBase.ResetMode;
 import com.revrobotics.spark.SparkBase.PersistMode;
 import com.revrobotics.spark.config.SparkMaxConfig;
+import com.revrobotics.spark.config.ClosedLoopConfig.FeedbackSensor;
 import com.revrobotics.RelativeEncoder;
 import com.revrobotics.spark.SparkClosedLoopController;
 
@@ -61,6 +62,7 @@ public class SwerveModule {
         .positionConversionFactor(1.0 / DriveConstants.kDriveMotorRotationsPerMeter)
         .velocityConversionFactor(1.0 / DriveConstants.kDriveMotorRotationsPerMeter / 60.0);
     driveConfig.closedLoop
+        .feedbackSensor(FeedbackSensor.kPrimaryEncoder)
         .p(DriveConstants.kDriveP)
         .i(DriveConstants.kDriveI)
         .d(DriveConstants.kDriveD);
@@ -70,6 +72,7 @@ public class SwerveModule {
         .positionConversionFactor(2 * Math.PI)
         .velocityConversionFactor(2 * Math.PI / 60.0);
     turningConfig.closedLoop
+        .feedbackSensor(FeedbackSensor.kPrimaryEncoder)
         .p(DriveConstants.kTurningP)
         .i(DriveConstants.kTurningI)
         .d(DriveConstants.kTurningD)
