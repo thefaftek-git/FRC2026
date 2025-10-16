@@ -5,6 +5,7 @@
 package frc.robot.subsystems;
 
 import com.ctre.phoenix6.hardware.Pigeon2;
+import com.ctre.phoenix6.sim.Pigeon2SimState;
 
 import edu.wpi.first.math.geometry.Pose2d;
 import edu.wpi.first.math.geometry.Rotation2d;
@@ -14,6 +15,7 @@ import edu.wpi.first.math.kinematics.SwerveDriveKinematics;
 import edu.wpi.first.math.kinematics.SwerveDriveOdometry;
 import edu.wpi.first.math.kinematics.SwerveModulePosition;
 import edu.wpi.first.math.kinematics.SwerveModuleState;
+import edu.wpi.first.wpilibj.RobotBase;
 import edu.wpi.first.wpilibj2.command.SubsystemBase;
 import frc.robot.Constants.DriveConstants;
 
@@ -48,6 +50,7 @@ public class SwerveDrive extends SubsystemBase {
 
   // The gyro sensor
   private final Pigeon2 m_pigeon = new Pigeon2(DriveConstants.kPigeonId);
+  private final Pigeon2SimState m_pigeonSim;
 
   // Odometry class for tracking robot pose
   SwerveDriveOdometry m_odometry;
@@ -77,6 +80,13 @@ public class SwerveDrive extends SubsystemBase {
   public SwerveDrive() {
     // Reset gyro
     m_pigeon.reset();
+
+    // Initialize simulation
+    if (RobotBase.isSimulation()) {
+      m_pigeonSim = m_pigeon.getSimState();
+    } else {
+      m_pigeonSim = null;
+    }
 
     m_odometry = new SwerveDriveOdometry(
         m_kinematics,
@@ -213,5 +223,31 @@ public class SwerveDrive extends SubsystemBase {
     m_frontRight.stop();
     m_backLeft.stop();
     m_backRight.stop();
+  }
+
+  @Override
+  public void simulationPeriodic() {
+    // Update module simulations
+    m_frontLeft.simulationPeriodic();
+    m_frontRight.simulationPeriodic();
+    m_backLeft.simulationPeriodic();
+    m_backRight.simulationPeriodic();
+
+    // Calculate the angular velocity based on module states
+    // This is a simplified simulation - in a real physics sim, you'd integrate velocities
+    if (RobotBase.isSimulation()) {
+      SwerveModuleState[] states = new SwerveModuleState[] {
+        m_frontLeft.getState(),
+        m_frontRight.getState(),
+        m_backLeft.getState(),
+        m_backRight.getState()
+      };
+      
+      ChassisSpeeds chassisSpeeds = m_kinematics.toChassisSpeeds(states);
+      
+      // Update the simulated gyro with the calculated angular velocity
+      // Add the change in yaw based on the chassis angular velocity
+      m_pigeonSim.addYaw(Math.toDegrees(chassisSpeeds.omegaRadiansPerSecond * 0.02));
+    }
   }
 }

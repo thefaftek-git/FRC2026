@@ -5,6 +5,7 @@
 package frc.robot.subsystems;
 
 import com.ctre.phoenix6.hardware.CANcoder;
+import com.ctre.phoenix6.sim.CANcoderSimState;
 import com.revrobotics.spark.SparkMax;
 import com.revrobotics.spark.SparkLowLevel.MotorType;
 import com.revrobotics.spark.SparkBase.ControlType;
@@ -12,12 +13,15 @@ import com.revrobotics.spark.SparkBase.ResetMode;
 import com.revrobotics.spark.SparkBase.PersistMode;
 import com.revrobotics.spark.config.SparkMaxConfig;
 import com.revrobotics.spark.config.ClosedLoopConfig.FeedbackSensor;
+import com.revrobotics.sim.SparkMaxSim;
 import com.revrobotics.RelativeEncoder;
 import com.revrobotics.spark.SparkClosedLoopController;
 
 import edu.wpi.first.math.geometry.Rotation2d;
 import edu.wpi.first.math.kinematics.SwerveModulePosition;
 import edu.wpi.first.math.kinematics.SwerveModuleState;
+import edu.wpi.first.math.system.plant.DCMotor;
+import edu.wpi.first.wpilibj.RobotBase;
 import frc.robot.Constants.DriveConstants;
 
 /**
@@ -35,6 +39,11 @@ public class SwerveModule {
   
   private final SparkClosedLoopController m_drivePIDController;
   private final SparkClosedLoopController m_turningPIDController;
+
+  // Simulation objects
+  private final SparkMaxSim m_driveMotorSim;
+  private final SparkMaxSim m_turningMotorSim;
+  private final CANcoderSimState m_canCoderSim;
 
   /**
    * Constructs a SwerveModule.
@@ -93,6 +102,17 @@ public class SwerveModule {
     // Get PID controllers
     m_drivePIDController = m_driveMotor.getClosedLoopController();
     m_turningPIDController = m_turningMotor.getClosedLoopController();
+    
+    // Initialize simulation objects
+    if (RobotBase.isSimulation()) {
+      m_driveMotorSim = new SparkMaxSim(m_driveMotor, DCMotor.getNEO(1));
+      m_turningMotorSim = new SparkMaxSim(m_turningMotor, DCMotor.getNEO(1));
+      m_canCoderSim = m_canCoder.getSimState();
+    } else {
+      m_driveMotorSim = null;
+      m_turningMotorSim = null;
+      m_canCoderSim = null;
+    }
     
     // Reset encoders
     resetEncoders();
@@ -155,5 +175,23 @@ public class SwerveModule {
   public void stop() {
     m_driveMotor.set(0);
     m_turningMotor.set(0);
+  }
+
+  /**
+   * Updates the simulation state of the swerve module.
+   * This method should be called periodically in simulation mode.
+   */
+  public void simulationPeriodic() {
+    if (RobotBase.isSimulation()) {
+      // Update drive motor simulation
+      m_driveMotorSim.iterate(m_driveEncoder.getVelocity(), 12.0, 0.02);
+      
+      // Update turning motor simulation
+      m_turningMotorSim.iterate(m_turningEncoder.getVelocity(), 12.0, 0.02);
+      
+      // Update CANcoder simulation with current turning position
+      m_canCoderSim.setRawPosition(m_turningEncoder.getPosition() / (2 * Math.PI));
+      m_canCoderSim.setVelocity(m_turningEncoder.getVelocity() / (2 * Math.PI));
+    }
   }
 }
