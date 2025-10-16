@@ -5,10 +5,14 @@
 package frc.robot.subsystems;
 
 import com.ctre.phoenix6.hardware.CANcoder;
-import com.revrobotics.CANSparkMax;
-import com.revrobotics.CANSparkLowLevel.MotorType;
+import com.revrobotics.spark.SparkMax;
+import com.revrobotics.spark.SparkLowLevel.MotorType;
+import com.revrobotics.spark.SparkBase.ControlType;
+import com.revrobotics.spark.SparkBase.ResetMode;
+import com.revrobotics.spark.SparkBase.PersistMode;
+import com.revrobotics.spark.config.SparkMaxConfig;
 import com.revrobotics.RelativeEncoder;
-import com.revrobotics.SparkPIDController;
+import com.revrobotics.spark.SparkClosedLoopController;
 
 import edu.wpi.first.math.geometry.Rotation2d;
 import edu.wpi.first.math.kinematics.SwerveModulePosition;
@@ -19,8 +23,8 @@ import frc.robot.Constants.DriveConstants;
  * Represents a single swerve module with drive and turning motors.
  */
 public class SwerveModule {
-  private final CANSparkMax m_driveMotor;
-  private final CANSparkMax m_turningMotor;
+  private final SparkMax m_driveMotor;
+  private final SparkMax m_turningMotor;
   
   private final RelativeEncoder m_driveEncoder;
   private final RelativeEncoder m_turningEncoder;
@@ -28,8 +32,8 @@ public class SwerveModule {
   private final CANcoder m_canCoder;
   private final double m_encoderOffset;
   
-  private final SparkPIDController m_drivePIDController;
-  private final SparkPIDController m_turningPIDController;
+  private final SparkClosedLoopController m_drivePIDController;
+  private final SparkClosedLoopController m_turningPIDController;
 
   /**
    * Constructs a SwerveModule.
@@ -45,12 +49,37 @@ public class SwerveModule {
       int canCoderId,
       double encoderOffset) {
     
-    m_driveMotor = new CANSparkMax(driveMotorId, MotorType.kBrushless);
-    m_turningMotor = new CANSparkMax(turningMotorId, MotorType.kBrushless);
+    m_driveMotor = new SparkMax(driveMotorId, MotorType.kBrushless);
+    m_turningMotor = new SparkMax(turningMotorId, MotorType.kBrushless);
     
-    // Factory reset to ensure clean state
-    m_driveMotor.restoreFactoryDefaults();
-    m_turningMotor.restoreFactoryDefaults();
+    // Create configurations for drive and turning motors
+    SparkMaxConfig driveConfig = new SparkMaxConfig();
+    SparkMaxConfig turningConfig = new SparkMaxConfig();
+    
+    // Configure drive motor
+    driveConfig.encoder
+        .positionConversionFactor(1.0 / DriveConstants.kDriveMotorRotationsPerMeter)
+        .velocityConversionFactor(1.0 / DriveConstants.kDriveMotorRotationsPerMeter / 60.0);
+    driveConfig.closedLoop
+        .p(DriveConstants.kDriveP)
+        .i(DriveConstants.kDriveI)
+        .d(DriveConstants.kDriveD);
+    
+    // Configure turning motor
+    turningConfig.encoder
+        .positionConversionFactor(2 * Math.PI)
+        .velocityConversionFactor(2 * Math.PI / 60.0);
+    turningConfig.closedLoop
+        .p(DriveConstants.kTurningP)
+        .i(DriveConstants.kTurningI)
+        .d(DriveConstants.kTurningD)
+        .positionWrappingEnabled(true)
+        .positionWrappingMinInput(-Math.PI)
+        .positionWrappingMaxInput(Math.PI);
+    
+    // Apply configurations
+    m_driveMotor.configure(driveConfig, ResetMode.kResetSafeParameters, PersistMode.kPersistParameters);
+    m_turningMotor.configure(turningConfig, ResetMode.kResetSafeParameters, PersistMode.kPersistParameters);
     
     m_driveEncoder = m_driveMotor.getEncoder();
     m_turningEncoder = m_turningMotor.getEncoder();
@@ -58,36 +87,9 @@ public class SwerveModule {
     m_canCoder = new CANcoder(canCoderId);
     m_encoderOffset = encoderOffset;
     
-    // Configure drive encoder to return meters
-    m_driveEncoder.setPositionConversionFactor(1.0 / DriveConstants.kDriveMotorRotationsPerMeter);
-    m_driveEncoder.setVelocityConversionFactor(1.0 / DriveConstants.kDriveMotorRotationsPerMeter / 60.0);
-    
-    // Configure turning encoder to return radians
-    m_turningEncoder.setPositionConversionFactor(2 * Math.PI);
-    m_turningEncoder.setVelocityConversionFactor(2 * Math.PI / 60.0);
-    
     // Get PID controllers
-    m_drivePIDController = m_driveMotor.getPIDController();
-    m_turningPIDController = m_turningMotor.getPIDController();
-    
-    // Set PID constants for drive motor
-    m_drivePIDController.setP(DriveConstants.kDriveP);
-    m_drivePIDController.setI(DriveConstants.kDriveI);
-    m_drivePIDController.setD(DriveConstants.kDriveD);
-    
-    // Set PID constants for turning motor
-    m_turningPIDController.setP(DriveConstants.kTurningP);
-    m_turningPIDController.setI(DriveConstants.kTurningI);
-    m_turningPIDController.setD(DriveConstants.kTurningD);
-    
-    // Enable PID wrapping for turning motor (continuous input from -pi to pi)
-    m_turningPIDController.setPositionPIDWrappingEnabled(true);
-    m_turningPIDController.setPositionPIDWrappingMinInput(-Math.PI);
-    m_turningPIDController.setPositionPIDWrappingMaxInput(Math.PI);
-    
-    // Save configurations
-    m_driveMotor.burnFlash();
-    m_turningMotor.burnFlash();
+    m_drivePIDController = m_driveMotor.getClosedLoopController();
+    m_turningPIDController = m_turningMotor.getClosedLoopController();
     
     // Reset encoders
     resetEncoders();
@@ -127,10 +129,10 @@ public class SwerveModule {
         new Rotation2d(m_turningEncoder.getPosition()));
 
     // Set drive motor velocity
-    m_drivePIDController.setReference(state.speedMetersPerSecond, CANSparkMax.ControlType.kVelocity);
+    m_drivePIDController.setReference(state.speedMetersPerSecond, ControlType.kVelocity);
     
     // Set turning motor position
-    m_turningPIDController.setReference(state.angle.getRadians(), CANSparkMax.ControlType.kPosition);
+    m_turningPIDController.setReference(state.angle.getRadians(), ControlType.kPosition);
   }
 
   /**
