@@ -1,0 +1,34 @@
+import org.gradle.internal.os.OperatingSystem
+
+pluginManagement {
+    repositories {
+        mavenLocal()
+        gradlePluginPortal()
+        String frcYear = '2024'
+        File frcHome
+        if (OperatingSystem.current().isWindows()) {
+            String publicFolder = System.getenv('PUBLIC')
+            if (publicFolder == null) {
+                publicFolder = "C:\\Users\\Public"
+            }
+            def frcHomePath = new File(publicFolder, "wpilib\\${frcYear}")
+            frcHome = frcHomePath
+        } else {
+            def userFolder = System.getProperty("user.home")
+            def frcHomePath = new File(userFolder, "wpilib/${frcYear}")
+            frcHome = frcHomePath
+        }
+        def frcHomeMaven = new File(frcHome, 'maven')
+        maven {
+            name 'frcHome'
+            url frcHomeMaven
+        }
+        maven {
+            name 'WPILibOnline'
+            url 'https://frcmaven.wpi.edu/artifactory/release/'
+        }
+    }
+}
+
+Properties props = System.getProperties();
+props.setProperty("org.gradle.internal.native.headers.unresolved.dependencies.ignore", "true");
