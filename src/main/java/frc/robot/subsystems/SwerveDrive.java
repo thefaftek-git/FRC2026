@@ -5,7 +5,9 @@
 package frc.robot.subsystems;
 
 import com.ctre.phoenix6.hardware.Pigeon2;
+import com.ctre.phoenix6.sim.Pigeon2SimState;
 
+import edu.wpi.first.math.MathUtil;
 import edu.wpi.first.math.geometry.Pose2d;
 import edu.wpi.first.math.geometry.Rotation2d;
 import edu.wpi.first.math.geometry.Translation2d;
@@ -14,8 +16,12 @@ import edu.wpi.first.math.kinematics.SwerveDriveKinematics;
 import edu.wpi.first.math.kinematics.SwerveDriveOdometry;
 import edu.wpi.first.math.kinematics.SwerveModulePosition;
 import edu.wpi.first.math.kinematics.SwerveModuleState;
+import edu.wpi.first.wpilibj.RobotBase;
+import edu.wpi.first.wpilibj.smartdashboard.Field2d;
+import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
 import edu.wpi.first.wpilibj2.command.SubsystemBase;
 import frc.robot.Constants.DriveConstants;
+import org.littletonrobotics.junction.Logger;
 
 /**
  * Represents a swerve drive style drivetrain.
@@ -23,24 +29,28 @@ import frc.robot.Constants.DriveConstants;
 public class SwerveDrive extends SubsystemBase {
   // Create swerve modules
   private final SwerveModule m_frontLeft = new SwerveModule(
+      "FrontLeft",
       DriveConstants.kFrontLeftDriveMotorId,
       DriveConstants.kFrontLeftTurningMotorId,
       DriveConstants.kFrontLeftCanCoderId,
       DriveConstants.kFrontLeftEncoderOffset);
 
   private final SwerveModule m_frontRight = new SwerveModule(
+      "FrontRight",
       DriveConstants.kFrontRightDriveMotorId,
       DriveConstants.kFrontRightTurningMotorId,
       DriveConstants.kFrontRightCanCoderId,
       DriveConstants.kFrontRightEncoderOffset);
 
   private final SwerveModule m_backLeft = new SwerveModule(
+      "BackLeft",
       DriveConstants.kBackLeftDriveMotorId,
       DriveConstants.kBackLeftTurningMotorId,
       DriveConstants.kBackLeftCanCoderId,
       DriveConstants.kBackLeftEncoderOffset);
 
   private final SwerveModule m_backRight = new SwerveModule(
+      "BackRight",
       DriveConstants.kBackRightDriveMotorId,
       DriveConstants.kBackRightTurningMotorId,
       DriveConstants.kBackRightCanCoderId,
@@ -48,6 +58,15 @@ public class SwerveDrive extends SubsystemBase {
 
   // The gyro sensor
   private final Pigeon2 m_pigeon = new Pigeon2(DriveConstants.kPigeonId);
+  private final Pigeon2SimState m_pigeonSim;
+  private double m_simulatedYawRadians = 0.0;
+  private final Field2d m_field = new Field2d();
+  private SwerveModuleState[] m_desiredStates = new SwerveModuleState[] {
+    new SwerveModuleState(),
+    new SwerveModuleState(),
+    new SwerveModuleState(),
+    new SwerveModuleState()
+  };
 
   // Odometry class for tracking robot pose
   SwerveDriveOdometry m_odometry;
@@ -78,6 +97,14 @@ public class SwerveDrive extends SubsystemBase {
     // Reset gyro
     m_pigeon.reset();
 
+    // Initialize simulation
+    if (RobotBase.isSimulation()) {
+      m_pigeonSim = m_pigeon.getSimState();
+      m_pigeonSim.setSupplyVoltage(DriveConstants.kSimSupplyVoltage);
+    } else {
+      m_pigeonSim = null;
+    }
+
     m_odometry = new SwerveDriveOdometry(
         m_kinematics,
         getRotation2d(),
@@ -87,19 +114,36 @@ public class SwerveDrive extends SubsystemBase {
           m_backLeft.getPosition(),
           m_backRight.getPosition()
         });
+
+    SmartDashboard.putData("Field", m_field);
   }
 
   @Override
   public void periodic() {
     // Update the odometry in the periodic block
-    m_odometry.update(
-        getRotation2d(),
-        new SwerveModulePosition[] {
-          m_frontLeft.getPosition(),
-          m_frontRight.getPosition(),
-          m_backLeft.getPosition(),
-          m_backRight.getPosition()
-        });
+    SwerveModulePosition[] modulePositions = new SwerveModulePosition[] {
+      m_frontLeft.getPosition(),
+      m_frontRight.getPosition(),
+      m_backLeft.getPosition(),
+      m_backRight.getPosition()
+    };
+    m_odometry.update(getRotation2d(), modulePositions);
+
+    Pose2d pose = m_odometry.getPoseMeters();
+    m_field.setRobotPose(pose);
+    Logger.recordOutput("Swerve/Pose", pose);
+    Logger.recordOutput("Swerve/MeasuredStates", SwerveModuleState.struct,
+        m_frontLeft.getState(),
+        m_frontRight.getState(),
+        m_backLeft.getState(),
+        m_backRight.getState());
+    Logger.recordOutput("Swerve/DesiredStates", SwerveModuleState.struct, m_desiredStates);
+    
+    // Update NetworkTables telemetry for all modules
+    m_frontLeft.updateTelemetry();
+    m_frontRight.updateTelemetry();
+    m_backLeft.updateTelemetry();
+    m_backRight.updateTelemetry();
   }
 
   /**
@@ -109,6 +153,11 @@ public class SwerveDrive extends SubsystemBase {
    */
   public Pose2d getPose() {
     return m_odometry.getPoseMeters();
+  }
+
+  /** Returns the Field2d instance for visualization tools. */
+  public Field2d getField() {
+    return m_field;
   }
 
   /**
@@ -159,10 +208,21 @@ public class SwerveDrive extends SubsystemBase {
    * @param desiredStates The desired SwerveModule states.
    */
   public void setModuleStates(SwerveModuleState[] desiredStates) {
-    m_frontLeft.setDesiredState(desiredStates[0]);
-    m_frontRight.setDesiredState(desiredStates[1]);
-    m_backLeft.setDesiredState(desiredStates[2]);
-    m_backRight.setDesiredState(desiredStates[3]);
+    if (desiredStates.length != 4) {
+      throw new IllegalArgumentException("Expected 4 swerve module states");
+    }
+
+    m_desiredStates = new SwerveModuleState[desiredStates.length];
+    for (int i = 0; i < desiredStates.length; i++) {
+      m_desiredStates[i] = new SwerveModuleState(
+          desiredStates[i].speedMetersPerSecond,
+          desiredStates[i].angle);
+    }
+
+    m_frontLeft.setDesiredState(m_desiredStates[0]);
+    m_frontRight.setDesiredState(m_desiredStates[1]);
+    m_backLeft.setDesiredState(m_desiredStates[2]);
+    m_backRight.setDesiredState(m_desiredStates[3]);
   }
 
   /** Resets the drive encoders to currently read a position of 0. */
@@ -213,5 +273,35 @@ public class SwerveDrive extends SubsystemBase {
     m_frontRight.stop();
     m_backLeft.stop();
     m_backRight.stop();
+  }
+
+  @Override
+  public void simulationPeriodic() {
+    // Update module simulations
+    m_frontLeft.simulationPeriodic();
+    m_frontRight.simulationPeriodic();
+    m_backLeft.simulationPeriodic();
+    m_backRight.simulationPeriodic();
+
+    // Calculate the angular velocity based on module states
+    // This is a simplified simulation - in a real physics sim, you'd integrate velocities
+    if (RobotBase.isSimulation()) {
+      SwerveModuleState[] states = new SwerveModuleState[] {
+        m_frontLeft.getState(),
+        m_frontRight.getState(),
+        m_backLeft.getState(),
+        m_backRight.getState()
+      };
+      
+      ChassisSpeeds chassisSpeeds = m_kinematics.toChassisSpeeds(states);
+      
+      if (m_pigeonSim != null) {
+        final double dt = 0.02;
+        m_simulatedYawRadians =
+            MathUtil.angleModulus(m_simulatedYawRadians + chassisSpeeds.omegaRadiansPerSecond * dt);
+        m_pigeonSim.setRawYaw(Math.toDegrees(m_simulatedYawRadians));
+        m_pigeonSim.setAngularVelocityZ(Math.toDegrees(chassisSpeeds.omegaRadiansPerSecond));
+      }
+    }
   }
 }

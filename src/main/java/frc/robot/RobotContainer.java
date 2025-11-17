@@ -4,6 +4,8 @@
 
 package frc.robot;
 
+import edu.wpi.first.wpilibj.DriverStation;
+import edu.wpi.first.wpilibj.GenericHID;
 import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.Commands;
 import edu.wpi.first.wpilibj2.command.button.CommandXboxController;
@@ -24,6 +26,9 @@ public class RobotContainer {
   // The driver's controller
   private final CommandXboxController m_driverController =
       new CommandXboxController(OperatorConstants.kDriverControllerPort);
+  
+  // Keyboard input for simulation/backup
+  private final GenericHID m_keyboard = new GenericHID(OperatorConstants.kKeyboardPort);
 
   /** The container for the robot. Contains subsystems, OI devices, and commands. */
   public RobotContainer() {
@@ -56,16 +61,74 @@ public class RobotContainer {
    */
   private void configureDefaultCommands() {
     // Set the default command for the drive subsystem
-    // Left stick Y-axis: forward/backward (inverted because joystick Y is negative when pushed forward)
-    // Left stick X-axis: left/right strafe
-    // Right stick X-axis: rotation
+    // Use keyboard if no controller is detected, otherwise use controller
     m_swerveDrive.setDefaultCommand(
         new DriveCommand(
             m_swerveDrive,
-            () -> applyDeadband(-m_driverController.getLeftY()),
-            () -> applyDeadband(-m_driverController.getLeftX()),
-            () -> applyDeadband(-m_driverController.getRightX()),
+            () -> isControllerConnected() ? applyDeadband(-m_driverController.getLeftY()) : getKeyboardForward(),
+            () -> isControllerConnected() ? applyDeadband(-m_driverController.getLeftX()) : getKeyboardStrafe(),
+            () -> isControllerConnected() ? applyDeadband(-m_driverController.getRightX()) : getKeyboardRotation(),
             true)); // Field-relative drive
+  }
+  
+  /**
+   * Check if a controller is connected.
+   *
+   * @return true if controller is connected
+   */
+  private boolean isControllerConnected() {
+    return DriverStation.isJoystickConnected(OperatorConstants.kDriverControllerPort);
+  }
+  
+  /**
+   * Get forward/backward speed from WASD keyboard.
+   * W = forward, S = backward
+   *
+   * @return speed value between -1 and 1
+   */
+  private double getKeyboardForward() {
+    double forward = 0;
+    if (m_keyboard.getRawButton(OperatorConstants.kKeyW)) {
+      forward += OperatorConstants.kKeyboardSpeed;
+    }
+    if (m_keyboard.getRawButton(OperatorConstants.kKeyS)) {
+      forward -= OperatorConstants.kKeyboardSpeed;
+    }
+    return forward;
+  }
+  
+  /**
+   * Get strafe left/right speed from WASD keyboard.
+   * A = left, D = right
+   *
+   * @return speed value between -1 and 1
+   */
+  private double getKeyboardStrafe() {
+    double strafe = 0;
+    if (m_keyboard.getRawButton(OperatorConstants.kKeyA)) {
+      strafe -= OperatorConstants.kKeyboardSpeed;
+    }
+    if (m_keyboard.getRawButton(OperatorConstants.kKeyD)) {
+      strafe += OperatorConstants.kKeyboardSpeed;
+    }
+    return strafe;
+  }
+  
+  /**
+   * Get rotation speed from keyboard.
+   * Q = counter-clockwise, E = clockwise
+   *
+   * @return rotation value between -1 and 1
+   */
+  private double getKeyboardRotation() {
+    double rotation = 0;
+    if (m_keyboard.getRawButton(OperatorConstants.kKeyQ)) {
+      rotation += OperatorConstants.kKeyboardSpeed;
+    }
+    if (m_keyboard.getRawButton(OperatorConstants.kKeyE)) {
+      rotation -= OperatorConstants.kKeyboardSpeed;
+    }
+    return rotation;
   }
 
   /**

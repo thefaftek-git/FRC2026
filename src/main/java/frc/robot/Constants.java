@@ -15,9 +15,21 @@ package frc.robot;
 public final class Constants {
   public static class OperatorConstants {
     public static final int kDriverControllerPort = 0;
+    public static final int kKeyboardPort = 1;
     
     // Controller deadband
     public static final double kDeadband = 0.1;
+    
+    // Keyboard keys (USB HID keycodes)
+    public static final int kKeyW = 26; // W key
+    public static final int kKeyA = 4;  // A key
+    public static final int kKeyS = 22; // S key
+    public static final int kKeyD = 7;  // D key
+    public static final int kKeyQ = 20; // Q key
+    public static final int kKeyE = 8;  // E key
+    
+    // Keyboard speed multiplier (slower than joystick for precision)
+    public static final double kKeyboardSpeed = 0.6;
   }
 
   public static class DriveConstants {
@@ -60,7 +72,7 @@ public final class Constants {
     public static final int kPigeonId = 13;
     
     // Turning motor PID constants - Tune these values
-    public static final double kTurningP = 0.5;
+    public static final double kTurningP = 0.2;
     public static final double kTurningI = 0.0;
     public static final double kTurningD = 0.0;
     
@@ -69,10 +81,20 @@ public final class Constants {
     public static final double kDriveI = 0.0;
     public static final double kDriveD = 0.0;
     
+    // Drive idle deadband to prevent tiny corrections when stopped
+    public static final double kDriveIdleDeadbandMetersPerSecond = 0.02;
+
     // Encoder offsets in radians - Calibrate these for your robot
     public static final double kFrontLeftEncoderOffset = 0.0;
     public static final double kFrontRightEncoderOffset = 0.0;
     public static final double kBackLeftEncoderOffset = 0.0;
     public static final double kBackRightEncoderOffset = 0.0;
+
+    // Simulation tuning constants
+    public static final double kSimSupplyVoltage = 12.0;
+    public static final double kDriveSimVelocityResponse = 6.0; // Larger -> faster response
+    public static final double kTurningSimVelocityResponse = 10.0;
+    public static final double kDriveSimVelocityDeadband = 1e-3;
+    public static final double kTurningSimVelocityDeadband = 1e-3;
   }
 }

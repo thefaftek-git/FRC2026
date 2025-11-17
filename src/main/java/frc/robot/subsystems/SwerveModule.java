@@ -5,22 +5,34 @@
 package frc.robot.subsystems;
 
 import com.ctre.phoenix6.hardware.CANcoder;
-import com.revrobotics.CANSparkMax;
-import com.revrobotics.CANSparkLowLevel.MotorType;
+import com.ctre.phoenix6.sim.CANcoderSimState;
+import com.revrobotics.spark.SparkMax;
+import com.revrobotics.spark.SparkLowLevel.MotorType;
+import com.revrobotics.spark.SparkBase.ControlType;
+import com.revrobotics.spark.SparkBase.ResetMode;
+import com.revrobotics.spark.SparkBase.PersistMode;
+import com.revrobotics.spark.config.SparkMaxConfig;
+import com.revrobotics.spark.config.ClosedLoopConfig.FeedbackSensor;
+import com.revrobotics.sim.SparkMaxSim;
 import com.revrobotics.RelativeEncoder;
-import com.revrobotics.SparkPIDController;
+import com.revrobotics.spark.SparkClosedLoopController;
 
 import edu.wpi.first.math.geometry.Rotation2d;
 import edu.wpi.first.math.kinematics.SwerveModulePosition;
 import edu.wpi.first.math.kinematics.SwerveModuleState;
+import edu.wpi.first.math.system.plant.DCMotor;
+import edu.wpi.first.networktables.NetworkTable;
+import edu.wpi.first.networktables.NetworkTableInstance;
+import edu.wpi.first.networktables.DoublePublisher;
+import edu.wpi.first.wpilibj.RobotBase;
 import frc.robot.Constants.DriveConstants;
 
 /**
  * Represents a single swerve module with drive and turning motors.
  */
 public class SwerveModule {
-  private final CANSparkMax m_driveMotor;
-  private final CANSparkMax m_turningMotor;
+  private final SparkMax m_driveMotor;
+  private final SparkMax m_turningMotor;
   
   private final RelativeEncoder m_driveEncoder;
   private final RelativeEncoder m_turningEncoder;
@@ -28,29 +40,78 @@ public class SwerveModule {
   private final CANcoder m_canCoder;
   private final double m_encoderOffset;
   
-  private final SparkPIDController m_drivePIDController;
-  private final SparkPIDController m_turningPIDController;
+  private final SparkClosedLoopController m_drivePIDController;
+  private final SparkClosedLoopController m_turningPIDController;
+
+  // Simulation objects
+  private final SparkMaxSim m_driveMotorSim;
+  private final SparkMaxSim m_turningMotorSim;
+  private final CANcoderSimState m_canCoderSim;
+  private double m_simDriveVelocityMetersPerSecond = 0.0;
+  private double m_simTurningVelocityRadiansPerSecond = 0.0;
+  
+  // NetworkTables publishers
+  private final DoublePublisher m_anglePublisher;
+  private final DoublePublisher m_velocityPublisher;
 
   /**
    * Constructs a SwerveModule.
    *
+   * @param moduleName Name of the module for NetworkTables (e.g., "FrontLeft")
    * @param driveMotorId CAN ID for the drive motor
    * @param turningMotorId CAN ID for the turning motor
    * @param canCoderId CAN ID for the CANcoder
    * @param encoderOffset Offset for the CANcoder in radians
    */
   public SwerveModule(
+      String moduleName,
       int driveMotorId,
       int turningMotorId,
       int canCoderId,
       double encoderOffset) {
     
-    m_driveMotor = new CANSparkMax(driveMotorId, MotorType.kBrushless);
-    m_turningMotor = new CANSparkMax(turningMotorId, MotorType.kBrushless);
+    m_driveMotor = new SparkMax(driveMotorId, MotorType.kBrushless);
+    m_turningMotor = new SparkMax(turningMotorId, MotorType.kBrushless);
     
-    // Factory reset to ensure clean state
-    m_driveMotor.restoreFactoryDefaults();
-    m_turningMotor.restoreFactoryDefaults();
+    // Initialize NetworkTables publishers
+    NetworkTable moduleTable = NetworkTableInstance.getDefault().getTable("SwerveModule").getSubTable(moduleName);
+    m_anglePublisher = moduleTable.getDoubleTopic("AngleDegrees").publish();
+    m_velocityPublisher = moduleTable.getDoubleTopic("VelocityMPS").publish();
+    
+    // Set default values so topics appear immediately
+    m_anglePublisher.set(0.0);
+    m_velocityPublisher.set(0.0);
+    
+    // Create configurations for drive and turning motors
+    SparkMaxConfig driveConfig = new SparkMaxConfig();
+    SparkMaxConfig turningConfig = new SparkMaxConfig();
+    
+    // Configure drive motor
+    driveConfig.encoder
+        .positionConversionFactor(1.0 / DriveConstants.kDriveMotorRotationsPerMeter)
+        .velocityConversionFactor(1.0 / DriveConstants.kDriveMotorRotationsPerMeter / 60.0);
+    driveConfig.closedLoop
+        .feedbackSensor(FeedbackSensor.kPrimaryEncoder)
+        .p(DriveConstants.kDriveP)
+        .i(DriveConstants.kDriveI)
+        .d(DriveConstants.kDriveD);
+    
+    // Configure turning motor
+    turningConfig.encoder
+        .positionConversionFactor(2 * Math.PI)
+        .velocityConversionFactor(2 * Math.PI / 60.0);
+    turningConfig.closedLoop
+        .feedbackSensor(FeedbackSensor.kPrimaryEncoder)
+        .p(DriveConstants.kTurningP)
+        .i(DriveConstants.kTurningI)
+        .d(DriveConstants.kTurningD)
+        .positionWrappingEnabled(true)
+        .positionWrappingMinInput(-Math.PI)
+        .positionWrappingMaxInput(Math.PI);
+    
+    // Apply configurations
+    m_driveMotor.configure(driveConfig, ResetMode.kResetSafeParameters, PersistMode.kPersistParameters);
+    m_turningMotor.configure(turningConfig, ResetMode.kResetSafeParameters, PersistMode.kPersistParameters);
     
     m_driveEncoder = m_driveMotor.getEncoder();
     m_turningEncoder = m_turningMotor.getEncoder();
@@ -58,36 +119,20 @@ public class SwerveModule {
     m_canCoder = new CANcoder(canCoderId);
     m_encoderOffset = encoderOffset;
     
-    // Configure drive encoder to return meters
-    m_driveEncoder.setPositionConversionFactor(1.0 / DriveConstants.kDriveMotorRotationsPerMeter);
-    m_driveEncoder.setVelocityConversionFactor(1.0 / DriveConstants.kDriveMotorRotationsPerMeter / 60.0);
-    
-    // Configure turning encoder to return radians
-    m_turningEncoder.setPositionConversionFactor(2 * Math.PI);
-    m_turningEncoder.setVelocityConversionFactor(2 * Math.PI / 60.0);
-    
     // Get PID controllers
-    m_drivePIDController = m_driveMotor.getPIDController();
-    m_turningPIDController = m_turningMotor.getPIDController();
+    m_drivePIDController = m_driveMotor.getClosedLoopController();
+    m_turningPIDController = m_turningMotor.getClosedLoopController();
     
-    // Set PID constants for drive motor
-    m_drivePIDController.setP(DriveConstants.kDriveP);
-    m_drivePIDController.setI(DriveConstants.kDriveI);
-    m_drivePIDController.setD(DriveConstants.kDriveD);
-    
-    // Set PID constants for turning motor
-    m_turningPIDController.setP(DriveConstants.kTurningP);
-    m_turningPIDController.setI(DriveConstants.kTurningI);
-    m_turningPIDController.setD(DriveConstants.kTurningD);
-    
-    // Enable PID wrapping for turning motor (continuous input from -pi to pi)
-    m_turningPIDController.setPositionPIDWrappingEnabled(true);
-    m_turningPIDController.setPositionPIDWrappingMinInput(-Math.PI);
-    m_turningPIDController.setPositionPIDWrappingMaxInput(Math.PI);
-    
-    // Save configurations
-    m_driveMotor.burnFlash();
-    m_turningMotor.burnFlash();
+    // Initialize simulation objects
+    if (RobotBase.isSimulation()) {
+      m_driveMotorSim = new SparkMaxSim(m_driveMotor, DCMotor.getNEO(1));
+      m_turningMotorSim = new SparkMaxSim(m_turningMotor, DCMotor.getNEO(1));
+      m_canCoderSim = m_canCoder.getSimState();
+    } else {
+      m_driveMotorSim = null;
+      m_turningMotorSim = null;
+      m_canCoderSim = null;
+    }
     
     // Reset encoders
     resetEncoders();
@@ -126,11 +171,16 @@ public class SwerveModule {
         desiredState,
         new Rotation2d(m_turningEncoder.getPosition()));
 
-    // Set drive motor velocity
-    m_drivePIDController.setReference(state.speedMetersPerSecond, CANSparkMax.ControlType.kVelocity);
+    // Apply a small deadband so we don't command tiny velocities when stopped
+    if (Math.abs(state.speedMetersPerSecond) < DriveConstants.kDriveIdleDeadbandMetersPerSecond) {
+      state.speedMetersPerSecond = 0.0;
+      m_driveMotor.set(0.0);
+    } else {
+      m_drivePIDController.setReference(state.speedMetersPerSecond, ControlType.kVelocity);
+    }
     
     // Set turning motor position
-    m_turningPIDController.setReference(state.angle.getRadians(), CANSparkMax.ControlType.kPosition);
+    m_turningPIDController.setReference(state.angle.getRadians(), ControlType.kPosition);
   }
 
   /**
@@ -150,5 +200,63 @@ public class SwerveModule {
   public void stop() {
     m_driveMotor.set(0);
     m_turningMotor.set(0);
+  }
+  
+  /**
+   * Updates NetworkTables with current module state.
+   * Should be called periodically.
+   */
+  public void updateTelemetry() {
+    // Publish wheel angle in degrees
+    m_anglePublisher.set(Math.toDegrees(m_turningEncoder.getPosition()));
+    
+    // Publish drive velocity in meters per second
+    m_velocityPublisher.set(m_driveEncoder.getVelocity());
+  }
+
+  /**
+   * Updates the simulation state of the swerve module.
+   * This method should be called periodically in simulation mode.
+   */
+  public void simulationPeriodic() {
+    if (RobotBase.isSimulation()) {
+    final double dt = 0.02;
+
+    // Get the applied motor output (duty cycle from -1 to 1)
+    double driveOutput = m_driveMotor.getAppliedOutput();
+    double turningOutput = m_turningMotor.getAppliedOutput();
+
+    double driveTargetVelocity = driveOutput * DriveConstants.kMaxSpeedMetersPerSecond;
+    double turningTargetVelocity = turningOutput * DriveConstants.kMaxAngularSpeedRadiansPerSecond;
+
+    m_simDriveVelocityMetersPerSecond +=
+      (driveTargetVelocity - m_simDriveVelocityMetersPerSecond)
+        * DriveConstants.kDriveSimVelocityResponse * dt;
+    m_simTurningVelocityRadiansPerSecond +=
+      (turningTargetVelocity - m_simTurningVelocityRadiansPerSecond)
+        * DriveConstants.kTurningSimVelocityResponse * dt;
+
+      if (Math.abs(driveTargetVelocity) < DriveConstants.kDriveSimVelocityDeadband
+          && Math.abs(m_simDriveVelocityMetersPerSecond) < DriveConstants.kDriveSimVelocityDeadband) {
+        m_simDriveVelocityMetersPerSecond = 0.0;
+      }
+      if (Math.abs(turningTargetVelocity) < DriveConstants.kTurningSimVelocityDeadband
+          && Math.abs(m_simTurningVelocityRadiansPerSecond) < DriveConstants.kTurningSimVelocityDeadband) {
+        m_simTurningVelocityRadiansPerSecond = 0.0;
+      }
+
+    // Advance the Spark MAX internal simulation state so relative encoders update
+    m_driveMotorSim.iterate(m_simDriveVelocityMetersPerSecond, DriveConstants.kSimSupplyVoltage, dt);
+    m_turningMotorSim.iterate(m_simTurningVelocityRadiansPerSecond, DriveConstants.kSimSupplyVoltage, dt);
+
+      // Update CANcoder simulation to match the turning motor's simulated position
+  double turningPositionRadians = m_turningEncoder.getPosition();
+  double turningEncoderVelocityRadiansPerSecond = m_turningEncoder.getVelocity();
+  double turningPositionRotations = turningPositionRadians / (2 * Math.PI);
+  double turningVelocityRotationsPerSecond = turningEncoderVelocityRadiansPerSecond / (2 * Math.PI);
+
+      m_canCoderSim.setRawPosition(turningPositionRotations);
+      m_canCoderSim.setVelocity(turningVelocityRotationsPerSecond);
+    }
   }
 }
