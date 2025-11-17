@@ -21,6 +21,9 @@ import edu.wpi.first.math.geometry.Rotation2d;
 import edu.wpi.first.math.kinematics.SwerveModulePosition;
 import edu.wpi.first.math.kinematics.SwerveModuleState;
 import edu.wpi.first.math.system.plant.DCMotor;
+import edu.wpi.first.networktables.NetworkTable;
+import edu.wpi.first.networktables.NetworkTableInstance;
+import edu.wpi.first.networktables.DoublePublisher;
 import edu.wpi.first.wpilibj.RobotBase;
 import frc.robot.Constants.DriveConstants;
 
@@ -44,16 +47,22 @@ public class SwerveModule {
   private final SparkMaxSim m_driveMotorSim;
   private final SparkMaxSim m_turningMotorSim;
   private final CANcoderSimState m_canCoderSim;
+  
+  // NetworkTables publishers
+  private final DoublePublisher m_anglePublisher;
+  private final DoublePublisher m_velocityPublisher;
 
   /**
    * Constructs a SwerveModule.
    *
+   * @param moduleName Name of the module for NetworkTables (e.g., "FrontLeft")
    * @param driveMotorId CAN ID for the drive motor
    * @param turningMotorId CAN ID for the turning motor
    * @param canCoderId CAN ID for the CANcoder
    * @param encoderOffset Offset for the CANcoder in radians
    */
   public SwerveModule(
+      String moduleName,
       int driveMotorId,
       int turningMotorId,
       int canCoderId,
@@ -61,6 +70,11 @@ public class SwerveModule {
     
     m_driveMotor = new SparkMax(driveMotorId, MotorType.kBrushless);
     m_turningMotor = new SparkMax(turningMotorId, MotorType.kBrushless);
+    
+    // Initialize NetworkTables publishers
+    NetworkTable moduleTable = NetworkTableInstance.getDefault().getTable("SwerveModule/" + moduleName);
+    m_anglePublisher = moduleTable.getDoubleTopic("AngleDegrees").publish();
+    m_velocityPublisher = moduleTable.getDoubleTopic("VelocityMPS").publish();
     
     // Create configurations for drive and turning motors
     SparkMaxConfig driveConfig = new SparkMaxConfig();
@@ -175,6 +189,18 @@ public class SwerveModule {
   public void stop() {
     m_driveMotor.set(0);
     m_turningMotor.set(0);
+  }
+  
+  /**
+   * Updates NetworkTables with current module state.
+   * Should be called periodically.
+   */
+  public void updateTelemetry() {
+    // Publish wheel angle in degrees
+    m_anglePublisher.set(Math.toDegrees(m_turningEncoder.getPosition()));
+    
+    // Publish drive velocity in meters per second
+    m_velocityPublisher.set(m_driveEncoder.getVelocity());
   }
 
   /**

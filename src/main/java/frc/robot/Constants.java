@@ -15,9 +15,21 @@ package frc.robot;
 public final class Constants {
   public static class OperatorConstants {
     public static final int kDriverControllerPort = 0;
+    public static final int kKeyboardPort = 1;
     
     // Controller deadband
     public static final double kDeadband = 0.1;
+    
+    // Keyboard keys (USB HID keycodes)
+    public static final int kKeyW = 26; // W key
+    public static final int kKeyA = 4;  // A key
+    public static final int kKeyS = 22; // S key
+    public static final int kKeyD = 7;  // D key
+    public static final int kKeyQ = 20; // Q key
+    public static final int kKeyE = 8;  // E key
+    
+    // Keyboard speed multiplier (slower than joystick for precision)
+    public static final double kKeyboardSpeed = 0.6;
   }
 
   public static class DriveConstants {

@@ -25,24 +25,28 @@ import frc.robot.Constants.DriveConstants;
 public class SwerveDrive extends SubsystemBase {
   // Create swerve modules
   private final SwerveModule m_frontLeft = new SwerveModule(
+      "FrontLeft",
       DriveConstants.kFrontLeftDriveMotorId,
       DriveConstants.kFrontLeftTurningMotorId,
       DriveConstants.kFrontLeftCanCoderId,
       DriveConstants.kFrontLeftEncoderOffset);
 
   private final SwerveModule m_frontRight = new SwerveModule(
+      "FrontRight",
       DriveConstants.kFrontRightDriveMotorId,
       DriveConstants.kFrontRightTurningMotorId,
       DriveConstants.kFrontRightCanCoderId,
       DriveConstants.kFrontRightEncoderOffset);
 
   private final SwerveModule m_backLeft = new SwerveModule(
+      "BackLeft",
       DriveConstants.kBackLeftDriveMotorId,
       DriveConstants.kBackLeftTurningMotorId,
       DriveConstants.kBackLeftCanCoderId,
       DriveConstants.kBackLeftEncoderOffset);
 
   private final SwerveModule m_backRight = new SwerveModule(
+      "BackRight",
       DriveConstants.kBackRightDriveMotorId,
       DriveConstants.kBackRightTurningMotorId,
       DriveConstants.kBackRightCanCoderId,
@@ -110,6 +114,12 @@ public class SwerveDrive extends SubsystemBase {
           m_backLeft.getPosition(),
           m_backRight.getPosition()
         });
+    
+    // Update NetworkTables telemetry for all modules
+    m_frontLeft.updateTelemetry();
+    m_frontRight.updateTelemetry();
+    m_backLeft.updateTelemetry();
+    m_backRight.updateTelemetry();
   }
 
   /**
