@@ -213,16 +213,17 @@ public class SwerveModule {
    */
   public void simulationPeriodic() {
     if (RobotBase.isSimulation()) {
-      // SparkMaxSim automatically updates encoder values based on motor output
-      // We just need to iterate the physics simulation
-      // The iterate() method uses the motor's applied output internally
-      m_driveMotorSim.iterate(m_driveMotorSim.getVelocity(), 12.0, 0.02);
-      m_turningMotorSim.iterate(m_turningMotorSim.getVelocity(), 12.0, 0.02);
+      // SparkMaxSim automatically updates encoder values based on motor controller output
+      // No need to call iterate() - it handles simulation internally
       
-      // Update CANcoder simulation to match the turning encoder position
-      // CANcoder reads in rotations, encoder is in radians
-      m_canCoderSim.setRawPosition(m_turningMotorSim.getPosition() / (2 * Math.PI));
-      m_canCoderSim.setVelocity(m_turningMotorSim.getVelocity() / (2 * Math.PI));
+      // Update CANcoder simulation to match the turning motor's simulated position
+      // SparkMaxSim maintains its own position/velocity which we can read
+      // CANcoder reads in rotations, turning encoder is in radians
+      double turningPositionRadians = m_turningMotorSim.getPosition();
+      double turningVelocityRadPerSec = m_turningMotorSim.getVelocity();
+      
+      m_canCoderSim.setRawPosition(turningPositionRadians / (2 * Math.PI));
+      m_canCoderSim.setVelocity(turningVelocityRadPerSec / (2 * Math.PI));
     }
   }
 }
