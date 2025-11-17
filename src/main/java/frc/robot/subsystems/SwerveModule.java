@@ -72,9 +72,13 @@ public class SwerveModule {
     m_turningMotor = new SparkMax(turningMotorId, MotorType.kBrushless);
     
     // Initialize NetworkTables publishers
-    NetworkTable moduleTable = NetworkTableInstance.getDefault().getTable("SwerveModule/" + moduleName);
+    NetworkTable moduleTable = NetworkTableInstance.getDefault().getTable("SwerveModule").getSubTable(moduleName);
     m_anglePublisher = moduleTable.getDoubleTopic("AngleDegrees").publish();
     m_velocityPublisher = moduleTable.getDoubleTopic("VelocityMPS").publish();
+    
+    // Set default values so topics appear immediately
+    m_anglePublisher.set(0.0);
+    m_velocityPublisher.set(0.0);
     
     // Create configurations for drive and turning motors
     SparkMaxConfig driveConfig = new SparkMaxConfig();
