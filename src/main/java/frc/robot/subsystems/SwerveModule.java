@@ -213,17 +213,30 @@ public class SwerveModule {
    */
   public void simulationPeriodic() {
     if (RobotBase.isSimulation()) {
-      // SparkMaxSim automatically updates encoder values based on motor controller output
-      // No need to call iterate() - it handles simulation internally
+      // Get the applied motor output (duty cycle from -1 to 1)
+      double driveOutput = m_driveMotor.getAppliedOutput();
+      double turningOutput = m_turningMotor.getAppliedOutput();
+      
+      // Calculate velocity in RPM based on motor output
+      // Free speed of NEO is approximately 5676 RPM
+      final double NEO_FREE_SPEED_RPM = 5676.0;
+      double driveVelocityRPM = driveOutput * NEO_FREE_SPEED_RPM;
+      double turningVelocityRPM = turningOutput * NEO_FREE_SPEED_RPM;
+      
+      // Update the encoder simulations
+      // This advances the encoder position based on velocity and time
+      m_driveMotorSim.getRelativeEncoderSim().iterate(driveVelocityRPM, 0.02);
+      m_turningMotorSim.getRelativeEncoderSim().iterate(turningVelocityRPM, 0.02);
       
       // Update CANcoder simulation to match the turning motor's simulated position
-      // SparkMaxSim maintains its own position/velocity which we can read
-      // CANcoder reads in rotations, turning encoder is in radians
-      double turningPositionRadians = m_turningMotorSim.getPosition();
-      double turningVelocityRadPerSec = m_turningMotorSim.getVelocity();
+      // Get the simulated position from the encoder sim
+      double turningPositionRotations = m_turningMotorSim.getRelativeEncoderSim().getPosition();
+      double turningVelocityRotationsPerSec = m_turningMotorSim.getRelativeEncoderSim().getVelocity() / 60.0;
       
-      m_canCoderSim.setRawPosition(turningPositionRadians / (2 * Math.PI));
-      m_canCoderSim.setVelocity(turningVelocityRadPerSec / (2 * Math.PI));
+      // CANcoder reads in rotations, but we need to apply the encoder conversion factor
+      // The turning encoder has a position conversion factor of 2*PI (radians per rotation)
+      m_canCoderSim.setRawPosition(turningPositionRotations);
+      m_canCoderSim.setVelocity(turningVelocityRotationsPerSec);
     }
   }
 }
