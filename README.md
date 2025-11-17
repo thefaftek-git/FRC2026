@@ -88,6 +88,26 @@ Before the robot can drive properly, you need to:
 ./gradlew test
 ```
 
+## Simulation & AdvantageScope Visualization
+
+This project publishes the drivetrain pose to NetworkTables via a `Field2d` instance under the
+`SmartDashboard/Field` key. Any tool that understands WPILib field data (including AdvantageScope)
+can subscribe to that topic and show the robot driving around the field while you run the WPILib
+simulator.
+
+### Steps
+1. Start the simulator (`./gradlew simulateJava` or VS Code's "Simulate Robot" command).
+2. Launch [AdvantageScope](https://github.com/Mechanical-Advantage/AdvantageScope) and connect to
+   `localhost` (or the IP/hostname where the sim is running) using the NT4 data source.
+3. Add a **Field** widget pointing at either `SmartDashboard/Field` (straight from WPILib) or
+   `RealOutputs/Swerve/Pose` (AdvantageKit pose feed).
+4. Drive the robot in sim—the robot pose, module telemetry, and gyro heading will stay in sync with
+   what you see on the dashboard, and AdvantageScope can log or replay the `RealOutputs/Swerve/*`
+   entries for post-match analysis.
+
+Because the same Field2d data is sent on the real robot, you can also use AdvantageScope for live
+events or log playback without changing code.
+
 ## Development
 
 ### Opening in VS Code

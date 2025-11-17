@@ -181,3 +181,4 @@ shuffleboard.json
 
 # NetworkTables save file
 networktables.json
+tmp/*

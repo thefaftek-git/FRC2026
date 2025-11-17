@@ -72,7 +72,7 @@ public final class Constants {
     public static final int kPigeonId = 13;
     
     // Turning motor PID constants - Tune these values
-    public static final double kTurningP = 0.5;
+    public static final double kTurningP = 0.2;
     public static final double kTurningI = 0.0;
     public static final double kTurningD = 0.0;
     
