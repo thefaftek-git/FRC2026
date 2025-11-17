@@ -47,6 +47,8 @@ public class SwerveModule {
   private final SparkMaxSim m_driveMotorSim;
   private final SparkMaxSim m_turningMotorSim;
   private final CANcoderSimState m_canCoderSim;
+  private double m_simDriveVelocityMetersPerSecond = 0.0;
+  private double m_simTurningVelocityRadiansPerSecond = 0.0;
   
   // NetworkTables publishers
   private final DoublePublisher m_anglePublisher;
@@ -169,8 +171,13 @@ public class SwerveModule {
         desiredState,
         new Rotation2d(m_turningEncoder.getPosition()));
 
-    // Set drive motor velocity
-    m_drivePIDController.setReference(state.speedMetersPerSecond, ControlType.kVelocity);
+    // Apply a small deadband so we don't command tiny velocities when stopped
+    if (Math.abs(state.speedMetersPerSecond) < DriveConstants.kDriveIdleDeadbandMetersPerSecond) {
+      state.speedMetersPerSecond = 0.0;
+      m_driveMotor.set(0.0);
+    } else {
+      m_drivePIDController.setReference(state.speedMetersPerSecond, ControlType.kVelocity);
+    }
     
     // Set turning motor position
     m_turningPIDController.setReference(state.angle.getRadians(), ControlType.kPosition);
@@ -213,24 +220,34 @@ public class SwerveModule {
    */
   public void simulationPeriodic() {
     if (RobotBase.isSimulation()) {
-      // Get the applied motor output (duty cycle from -1 to 1)
-      double driveOutput = m_driveMotor.getAppliedOutput();
-      double turningOutput = m_turningMotor.getAppliedOutput();
+    final double dt = 0.02;
 
-      // Calculate velocity in RPM based on motor output
-      // Free speed of NEO is approximately 5676 RPM
-      final double NEO_FREE_SPEED_RPM = 5676.0;
-      double driveVelocityRPM = driveOutput * NEO_FREE_SPEED_RPM;
-      double turningVelocityRPM = turningOutput * NEO_FREE_SPEED_RPM;
+    // Get the applied motor output (duty cycle from -1 to 1)
+    double driveOutput = m_driveMotor.getAppliedOutput();
+    double turningOutput = m_turningMotor.getAppliedOutput();
 
-      // Convert motor RPM to the configured encoder units for SparkSim
-      double driveVelocityMetersPerSecond =
-          (driveVelocityRPM / 60.0) / DriveConstants.kDriveMotorRotationsPerMeter;
-      double turningVelocityRadiansPerSecond = turningVelocityRPM * (2 * Math.PI / 60.0);
+    double driveTargetVelocity = driveOutput * DriveConstants.kMaxSpeedMetersPerSecond;
+    double turningTargetVelocity = turningOutput * DriveConstants.kMaxAngularSpeedRadiansPerSecond;
 
-      // Advance the Spark MAX internal simulation state so relative encoders update
-      m_driveMotorSim.iterate(driveVelocityMetersPerSecond, 12.0, 0.02);
-      m_turningMotorSim.iterate(turningVelocityRadiansPerSecond, 12.0, 0.02);
+    m_simDriveVelocityMetersPerSecond +=
+      (driveTargetVelocity - m_simDriveVelocityMetersPerSecond)
+        * DriveConstants.kDriveSimVelocityResponse * dt;
+    m_simTurningVelocityRadiansPerSecond +=
+      (turningTargetVelocity - m_simTurningVelocityRadiansPerSecond)
+        * DriveConstants.kTurningSimVelocityResponse * dt;
+
+      if (Math.abs(driveTargetVelocity) < DriveConstants.kDriveSimVelocityDeadband
+          && Math.abs(m_simDriveVelocityMetersPerSecond) < DriveConstants.kDriveSimVelocityDeadband) {
+        m_simDriveVelocityMetersPerSecond = 0.0;
+      }
+      if (Math.abs(turningTargetVelocity) < DriveConstants.kTurningSimVelocityDeadband
+          && Math.abs(m_simTurningVelocityRadiansPerSecond) < DriveConstants.kTurningSimVelocityDeadband) {
+        m_simTurningVelocityRadiansPerSecond = 0.0;
+      }
+
+    // Advance the Spark MAX internal simulation state so relative encoders update
+    m_driveMotorSim.iterate(m_simDriveVelocityMetersPerSecond, DriveConstants.kSimSupplyVoltage, dt);
+    m_turningMotorSim.iterate(m_simTurningVelocityRadiansPerSecond, DriveConstants.kSimSupplyVoltage, dt);
 
       // Update CANcoder simulation to match the turning motor's simulated position
   double turningPositionRadians = m_turningEncoder.getPosition();

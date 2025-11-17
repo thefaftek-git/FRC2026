@@ -81,10 +81,20 @@ public final class Constants {
     public static final double kDriveI = 0.0;
     public static final double kDriveD = 0.0;
     
+    // Drive idle deadband to prevent tiny corrections when stopped
+    public static final double kDriveIdleDeadbandMetersPerSecond = 0.02;
+
     // Encoder offsets in radians - Calibrate these for your robot
     public static final double kFrontLeftEncoderOffset = 0.0;
     public static final double kFrontRightEncoderOffset = 0.0;
     public static final double kBackLeftEncoderOffset = 0.0;
     public static final double kBackRightEncoderOffset = 0.0;
+
+    // Simulation tuning constants
+    public static final double kSimSupplyVoltage = 12.0;
+    public static final double kDriveSimVelocityResponse = 6.0; // Larger -> faster response
+    public static final double kTurningSimVelocityResponse = 10.0;
+    public static final double kDriveSimVelocityDeadband = 1e-3;
+    public static final double kTurningSimVelocityDeadband = 1e-3;
   }
 }

@@ -7,6 +7,7 @@ package frc.robot.subsystems;
 import com.ctre.phoenix6.hardware.Pigeon2;
 import com.ctre.phoenix6.sim.Pigeon2SimState;
 
+import edu.wpi.first.math.MathUtil;
 import edu.wpi.first.math.geometry.Pose2d;
 import edu.wpi.first.math.geometry.Rotation2d;
 import edu.wpi.first.math.geometry.Translation2d;
@@ -55,6 +56,7 @@ public class SwerveDrive extends SubsystemBase {
   // The gyro sensor
   private final Pigeon2 m_pigeon = new Pigeon2(DriveConstants.kPigeonId);
   private final Pigeon2SimState m_pigeonSim;
+  private double m_simulatedYawRadians = 0.0;
 
   // Odometry class for tracking robot pose
   SwerveDriveOdometry m_odometry;
@@ -88,6 +90,7 @@ public class SwerveDrive extends SubsystemBase {
     // Initialize simulation
     if (RobotBase.isSimulation()) {
       m_pigeonSim = m_pigeon.getSimState();
+      m_pigeonSim.setSupplyVoltage(DriveConstants.kSimSupplyVoltage);
     } else {
       m_pigeonSim = null;
     }
@@ -255,9 +258,13 @@ public class SwerveDrive extends SubsystemBase {
       
       ChassisSpeeds chassisSpeeds = m_kinematics.toChassisSpeeds(states);
       
-      // Update the simulated gyro with the calculated angular velocity
-      // Add the change in yaw based on the chassis angular velocity
-      m_pigeonSim.addYaw(Math.toDegrees(chassisSpeeds.omegaRadiansPerSecond * 0.02));
+      if (m_pigeonSim != null) {
+        final double dt = 0.02;
+        m_simulatedYawRadians =
+            MathUtil.angleModulus(m_simulatedYawRadians + chassisSpeeds.omegaRadiansPerSecond * dt);
+        m_pigeonSim.setRawYaw(Math.toDegrees(m_simulatedYawRadians));
+        m_pigeonSim.setAngularVelocityZ(Math.toDegrees(chassisSpeeds.omegaRadiansPerSecond));
+      }
     }
   }
 }
