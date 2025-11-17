@@ -216,27 +216,30 @@ public class SwerveModule {
       // Get the applied motor output (duty cycle from -1 to 1)
       double driveOutput = m_driveMotor.getAppliedOutput();
       double turningOutput = m_turningMotor.getAppliedOutput();
-      
+
       // Calculate velocity in RPM based on motor output
       // Free speed of NEO is approximately 5676 RPM
       final double NEO_FREE_SPEED_RPM = 5676.0;
       double driveVelocityRPM = driveOutput * NEO_FREE_SPEED_RPM;
       double turningVelocityRPM = turningOutput * NEO_FREE_SPEED_RPM;
-      
-      // Update the encoder simulations
-      // This advances the encoder position based on velocity and time
-      m_driveMotorSim.getRelativeEncoderSim().iterate(driveVelocityRPM, 0.02);
-      m_turningMotorSim.getRelativeEncoderSim().iterate(turningVelocityRPM, 0.02);
-      
+
+      // Convert motor RPM to the configured encoder units for SparkSim
+      double driveVelocityMetersPerSecond =
+          (driveVelocityRPM / 60.0) / DriveConstants.kDriveMotorRotationsPerMeter;
+      double turningVelocityRadiansPerSecond = turningVelocityRPM * (2 * Math.PI / 60.0);
+
+      // Advance the Spark MAX internal simulation state so relative encoders update
+      m_driveMotorSim.iterate(driveVelocityMetersPerSecond, 12.0, 0.02);
+      m_turningMotorSim.iterate(turningVelocityRadiansPerSecond, 12.0, 0.02);
+
       // Update CANcoder simulation to match the turning motor's simulated position
-      // Get the simulated position from the encoder sim
-      double turningPositionRotations = m_turningMotorSim.getRelativeEncoderSim().getPosition();
-      double turningVelocityRotationsPerSec = m_turningMotorSim.getRelativeEncoderSim().getVelocity() / 60.0;
-      
-      // CANcoder reads in rotations, but we need to apply the encoder conversion factor
-      // The turning encoder has a position conversion factor of 2*PI (radians per rotation)
+  double turningPositionRadians = m_turningEncoder.getPosition();
+  double turningEncoderVelocityRadiansPerSecond = m_turningEncoder.getVelocity();
+  double turningPositionRotations = turningPositionRadians / (2 * Math.PI);
+  double turningVelocityRotationsPerSecond = turningEncoderVelocityRadiansPerSecond / (2 * Math.PI);
+
       m_canCoderSim.setRawPosition(turningPositionRotations);
-      m_canCoderSim.setVelocity(turningVelocityRotationsPerSec);
+      m_canCoderSim.setVelocity(turningVelocityRotationsPerSecond);
     }
   }
 }
